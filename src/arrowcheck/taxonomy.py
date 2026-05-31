@@ -20,6 +20,7 @@ class Stage(StrEnum):
     MAP = "map"
     MOVE = "move"
     SANITIZE = "sanitize"
+    BATCH = "batch"
     INTERNAL = "internal"
 
 
@@ -40,6 +41,9 @@ class ErrorCode(StrEnum):
 
     VALENCE_EXCEEDED = "E_VALENCE_EXCEEDED"
     RDKIT_SANITIZE_FAILED = "E_RDKIT_SANITIZE_FAILED"
+
+    BATCH_JSON_INVALID = "E_BATCH_JSON_INVALID"
+    BATCH_SCHEMA_INVALID = "E_BATCH_SCHEMA_INVALID"
 
     UPSTREAM_INTERNAL = "E_UPSTREAM_INTERNAL"
 

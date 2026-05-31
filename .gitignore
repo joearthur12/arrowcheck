@@ -7,3 +7,5 @@ __pycache__/
 .mplconfig/
 
 src/arrowcheck.egg-info/
+
+artifacts/

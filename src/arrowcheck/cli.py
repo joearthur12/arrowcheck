@@ -6,7 +6,9 @@ from pathlib import Path
 import typer
 from rich.console import Console
 from rich.panel import Panel
+from rich.table import Table
 
+from arrowcheck.batch import BatchSummary, lint_jsonl
 from arrowcheck.engine import lint_mechanism
 from arrowcheck.taxonomy import ValidationResult
 
@@ -35,6 +37,25 @@ CONTEXT_OPTION = typer.Option(
     None,
     "--context",
     help="Optional context string for upstream ChRIMP.",
+)
+BATCH_INPUT_ARGUMENT = typer.Argument(
+    ...,
+    help="Path to a JSONL file containing batch records.",
+)
+BATCH_OUTPUT_OPTION = typer.Option(
+    None,
+    "--output",
+    help="Optional output JSONL path for per-record results.",
+)
+BATCH_SUMMARY_OPTION = typer.Option(
+    None,
+    "--summary",
+    help="Optional JSON summary output path.",
+)
+FAIL_ON_INVALID_OPTION = typer.Option(
+    False,
+    "--fail-on-invalid",
+    help="Return exit code 1 if any processed record is invalid.",
 )
 
 
@@ -65,6 +86,32 @@ def lint(
         _render_text_result(result)
 
     raise typer.Exit(code=0 if result.is_valid else 1)
+
+
+@app.command()
+def batch(
+    input_file: Path = BATCH_INPUT_ARGUMENT,
+    output: Path | None = BATCH_OUTPUT_OPTION,
+    summary: Path | None = BATCH_SUMMARY_OPTION,
+    fail_on_invalid: bool = FAIL_ON_INVALID_OPTION,
+) -> None:
+    if not input_file.is_file():
+        console.print(
+            f"Error: batch input file not found: {input_file}",
+            style="bold red",
+        )
+        raise typer.Exit(code=2)
+
+    batch_summary = lint_jsonl(input_file, output_path=output)
+    if summary is not None:
+        summary.parent.mkdir(parents=True, exist_ok=True)
+        summary.write_text(batch_summary.model_dump_json(indent=2), encoding="utf-8")
+
+    _render_batch_summary(batch_summary)
+
+    if fail_on_invalid and batch_summary.invalid_records > 0:
+        raise typer.Exit(code=1)
+    raise typer.Exit(code=0)
 
 
 def _render_text_result(result: ValidationResult) -> None:
@@ -101,6 +148,29 @@ def _render_text_result(result: ValidationResult) -> None:
                 f"{issue.raw_exception_type or '<none>'}: "
                 f"{issue.raw_exception_message or '<none>'}"
             )
+
+
+def _render_batch_summary(summary: BatchSummary) -> None:
+    console.print("[bold]ArrowCheck Batch Summary[/bold]")
+    console.print()
+
+    counts_table = Table.grid(padding=(0, 2))
+    counts_table.add_column(justify="left")
+    counts_table.add_column(justify="right")
+    counts_table.add_row("Total records:", str(summary.total_records))
+    counts_table.add_row("Valid records:", str(summary.valid_records))
+    counts_table.add_row("Invalid records:", str(summary.invalid_records))
+    console.print(counts_table)
+
+    if summary.error_counts:
+        console.print()
+        console.print("[bold]Errors:[/bold]")
+        errors_table = Table.grid(padding=(0, 2))
+        errors_table.add_column(justify="left")
+        errors_table.add_column(justify="right")
+        for error_code, count in summary.error_counts.items():
+            errors_table.add_row(error_code, str(count))
+        console.print(errors_table)
 
 
 if __name__ == "__main__":

@@ -9,6 +9,7 @@ ArrowCheck does not use `eval()` in its own code.
 ## What ArrowCheck does
 
 - validates one MechSMILES string at a time;
+- streams JSONL batch inputs one record at a time for large model-output files;
 - safely parses the input with RDKit plus `ast.literal_eval()`;
 - rejects malformed tuple shapes and duplicate atom-map identifiers even where
   upstream ChRIMP currently accepts them;
@@ -18,7 +19,6 @@ ArrowCheck does not use `eval()` in its own code.
 ## What ArrowCheck does not claim yet
 
 - It does not prove full chemical plausibility.
-- It does not implement batch processing.
 - It does not generate HTML reports.
 - It does not provide rendering or visualisation.
 - `hv` handling is deferred to a later milestone.
@@ -56,6 +56,83 @@ Provide optional context:
 arrowcheck lint examples\valid.txt --context "CCO"
 ```
 
+Run streaming batch linting:
+
+```powershell
+arrowcheck batch examples\batch_mixed.jsonl
+```
+
+Write streaming JSONL results plus a JSON summary:
+
+```powershell
+arrowcheck batch examples\batch_mixed.jsonl --output artifacts\batch_results.jsonl --summary artifacts\batch_summary.json
+```
+
+Make invalid records fail the shell command after processing completes:
+
+```powershell
+arrowcheck batch examples\batch_mixed.jsonl --fail-on-invalid
+```
+
+## JSONL batch input schema
+
+Each nonblank line must be a JSON object with:
+
+```json
+{
+  "case_id": "optional-string",
+  "mechsmiles": "required-mechsmiles-string",
+  "context": "optional-context-string",
+  "metadata": {
+    "optional": "json-compatible values"
+  }
+}
+```
+
+- Blank lines are ignored.
+- Missing `case_id` falls back to `line-<line_number>`.
+- Malformed JSON rows and schema-invalid rows are reported without stopping the batch.
+
+## JSONL batch output schema
+
+When `--output` is provided, ArrowCheck writes one JSON object per processed
+nonblank input row with this shape:
+
+```json
+{
+  "line_number": 1,
+  "case_id": "valid-1",
+  "metadata": {
+    "source": "demo"
+  },
+  "validation": {
+    "is_valid": true,
+    "original_mechsmiles": "C[C:2](=[O:3])C.[NH3:1]|(1,2);((2,3),3)",
+    "final_smiles": "CC(C)([NH3+])[O-]",
+    "issues": []
+  },
+  "raw_record": null
+}
+```
+
+Malformed JSON and schema-invalid rows remain in the output stream with a batch
+diagnostic and preserved raw row text when available.
+
+## Exit codes
+
+- `arrowcheck lint ...` returns `0` for valid input and `1` for invalid input.
+- `arrowcheck batch ...` returns `0` when processing completes, even if some
+  records are invalid.
+- `arrowcheck batch ... --fail-on-invalid` returns `1` if any processed record
+  is invalid.
+- CLI misuse such as a missing input file returns `2`.
+
+## Batch notes
+
+- Batch mode is streaming and suitable for large JSONL model-output files.
+- HTML reporting is still deferred.
+- `hv` handling is still deferred.
+
 ## Security stance
 
 - ArrowCheck never calls `eval()` on mechanism text.
@@ -70,4 +147,3 @@ arrowcheck lint examples\valid.txt --context "CCO"
 - Local pinned upstream checkout: `upstream/ChRIMP`
 - Pinned SHA: `56dd595af0ce2ab8d594d2201c9906cc48489089`
 - Experimentally observed behavior is documented in `UPSTREAM_NOTES.md`
-

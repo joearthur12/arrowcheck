@@ -1,0 +1,7 @@
+{"case_id":"valid-1","mechsmiles":"C[C:2](=[O:3])C.[NH3:1]|(1,2);((2,3),3)","metadata":{"source":"demo","rank":1}}
+
+{"case_id":"bad-tuple","mechsmiles":"[OH-:1].[H+:2]|(1,2,3)"}
+{"case_id":"unknown-map","mechsmiles":"C[C:2](=[O:3])C.[NH3:1]|(9,2)"}
+{"case_id":"broken-json","mechsmiles":"[CH3:1]|"
+{"case_id":"missing-mech","metadata":{"source":"schema"}}
+{"mechsmiles":"[CH3:1]|","metadata":{"note":"radical-noop"}}
