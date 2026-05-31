@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -9,6 +10,7 @@ from arrowcheck.batch import lint_jsonl
 from arrowcheck.cli import app
 
 runner = CliRunner()
+ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
 
 
 def write_mechanism(tmp_path: Path, name: str, contents: str) -> Path:
@@ -57,6 +59,11 @@ def write_results_file(tmp_path: Path, name: str = "results.jsonl") -> Path:
     results_path = tmp_path / name
     lint_jsonl(batch_input, output_path=results_path)
     return results_path
+
+
+def normalized_cli_output(output: str) -> str:
+    without_ansi = ANSI_ESCAPE_RE.sub("", output)
+    return " ".join(without_ansi.split())
 
 
 def test_valid_text_output_and_exit_code(tmp_path: Path) -> None:
@@ -228,7 +235,10 @@ def test_batch_cli_rejects_negative_report_max_rows(tmp_path: Path) -> None:
     )
 
     assert result.exit_code == 2
-    assert "Invalid value for '--report-max-rows'" in result.output
+    normalized_output = normalized_cli_output(result.output)
+    assert "Invalid value" in normalized_output
+    assert "report-max-rows" in normalized_output
+    assert "x>=0" in normalized_output
     assert not report_path.exists()
 
 
@@ -322,7 +332,10 @@ def test_report_cli_rejects_negative_report_max_rows(tmp_path: Path) -> None:
     )
 
     assert result.exit_code == 2
-    assert "Invalid value for '--report-max-rows'" in result.output
+    normalized_output = normalized_cli_output(result.output)
+    assert "Invalid value" in normalized_output
+    assert "report-max-rows" in normalized_output
+    assert "x>=0" in normalized_output
     assert not report_path.exists()
 
 
