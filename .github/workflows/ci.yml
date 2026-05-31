@@ -1,0 +1,54 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      CHRIMP_SHA: 56dd595af0ce2ab8d594d2201c9906cc48489089
+
+    steps:
+      - name: Check out ArrowCheck
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # ArrowCheck currently expects a local pinned ChRIMP checkout.
+      # This workflow intentionally relies on the lint-only visualizer bypass,
+      # so it does not install native Cairo packages here.
+      - name: Clone pinned ChRIMP checkout
+        run: |
+          mkdir -p upstream
+          git clone https://github.com/schwallergroup/ChRIMP.git upstream/ChRIMP
+          git -C upstream/ChRIMP checkout "$CHRIMP_SHA"
+          git -C upstream/ChRIMP rev-parse HEAD
+
+      - name: Install ArrowCheck and dev dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Run pytest
+        run: python -m pytest -q
+
+      - name: Run Ruff
+        run: python -m ruff check .
+
+      - name: Run mypy
+        run: python -m mypy src
+
+      # Current uncertainty: this path assumes PyPI wheels for rdkit remain
+      # available on ubuntu-latest for Python 3.12. If that changes, the
+      # fallback is to move this workflow to windows-latest.

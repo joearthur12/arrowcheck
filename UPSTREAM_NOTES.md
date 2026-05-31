@@ -190,23 +190,23 @@ Practical takeaway:
 ## Milestone 0.5 environment facts
 
 - Confirmed ArrowCheck Git repository root:
-  - `C:\Users\joear\OneDrive\Documents\arrowcheck`
+  - the current `arrowcheck` workspace root
 - `git init` was run in the ArrowCheck workspace.
 - `git rev-parse --show-toplevel` returned:
-  - `C:/Users/joear/OneDrive/Documents/arrowcheck`
+  - the ArrowCheck workspace root
 
 ## Exact package installation commands
 
 Installed with the explicitly requested interpreter:
 
 ```powershell
-C:\Users\joear\miniconda3\envs\arrowcheck\python.exe -m pip install rdkit colorama numpy matplotlib pillow cairosvg svgutils pytest
+python -m pip install rdkit colorama numpy matplotlib pillow cairosvg svgutils pytest
 ```
 
 Recorded package snapshot command:
 
 ```powershell
-C:\Users\joear\miniconda3\envs\arrowcheck\python.exe -m pip list --format=freeze
+python -m pip list --format=freeze
 ```
 
 ## Exact installed packages observed after the probe install

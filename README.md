@@ -1,59 +1,61 @@
 # ArrowCheck
 
-ArrowCheck is a secure structural linter for single-step MechSMILES.
+Secure structural linting and batch debugging for MechSMILES reaction mechanisms.
 
-Version 0.1 wraps the pinned local ChRIMP checkout for the scientific move
-execution path, but it adds strict safe parsing before upstream execution.
-ArrowCheck does not use `eval()` in its own code.
+ArrowCheck checks machine-generated reaction mechanisms before they reach the
+underlying chemistry engine. It rejects unsafe text, malformed arrows, invalid
+atom mappings, nonexistent bonds, and other structural failures, then returns
+stable diagnostics for researchers evaluating chemistry models.
 
-## What ArrowCheck does
+ArrowCheck currently wraps a pinned local ChRIMP checkout for the underlying
+move-execution path, but it adds a strict safe-parser boundary and canonical
+reconstruction before upstream execution.
 
-- validates one MechSMILES string at a time;
-- streams JSONL batch inputs one record at a time for large model-output files;
-- can emit a self-contained offline HTML batch report for retained invalid rows;
-- can regenerate the same HTML report from saved ArrowCheck `results.jsonl`
-  output so you can lint once, report many times;
-- safely parses the input with RDKit plus `ast.literal_eval()`;
-- rejects malformed tuple shapes and duplicate atom-map identifiers even where
-  upstream ChRIMP currently accepts them;
-- calls the pinned upstream ChRIMP logic only after local validation succeeds;
-- reports stable error codes and preserves raw upstream exception details.
-
-## What ArrowCheck does not claim yet
-
-- It does not prove full chemical plausibility.
-- It does not provide rendering or visualisation.
-- It does not render chemical structure diagrams inside reports yet.
-- `hv` handling is deferred to a later milestone.
-
-The lint-only adapter deliberately bypasses upstream visualisation imports
-because rendering is outside Milestone 1A and direct visualisation imports pull
-in native Cairo requirements that are not needed for `.prod` linting.
-
-## Install
-
-The project uses a modern `src/` layout and is intended to be installed
-editable during development:
+## Quick Start
 
 ```powershell
-C:\Users\joear\miniconda3\envs\arrowcheck\python.exe -m pip install -e .
+conda create -n arrowcheck python=3.12 -y
+conda activate arrowcheck
+python -m pip install -e .
+arrowcheck lint examples\valid.txt
+arrowcheck batch examples\batch_mixed.jsonl --output artifacts\batch_results.jsonl --html-report artifacts\batch_report.html
+arrowcheck report artifacts\batch_results.jsonl --html-report artifacts\regenerated_report.html
 ```
+
+Current repository expectation:
+
+- local pinned upstream checkout path: `upstream/ChRIMP`
+- pinned upstream SHA: `56dd595af0ce2ab8d594d2201c9906cc48489089`
+
+Automated upstream acquisition and packaging will be improved later. For now,
+the repository expects the pinned local checkout to already exist under
+`upstream/ChRIMP`.
+
+## Features
+
+- Secure single-step structural linting for MechSMILES reaction mechanisms.
+- Canonical safe reconstruction before ChRIMP execution.
+- Stable error taxonomy for parser, mapping, move, sanitization, and batch
+  failures.
+- Streaming JSONL batch linting for large model-output files.
+- Secure offline HTML reports for invalid rows.
+- Saved-results HTML regeneration so you can lint once, report many times.
 
 ## CLI
 
-Lint a mechanism file:
+Lint one mechanism file:
 
 ```powershell
 arrowcheck lint examples\valid.txt
 ```
 
-Emit full JSON:
+Emit JSON instead of Rich text:
 
 ```powershell
 arrowcheck lint examples\valid.txt --format json
 ```
 
-Provide optional context:
+Provide optional context to the upstream engine:
 
 ```powershell
 arrowcheck lint examples\valid.txt --context "CCO"
@@ -65,16 +67,10 @@ Run streaming batch linting:
 arrowcheck batch examples\batch_mixed.jsonl
 ```
 
-Write streaming JSONL results plus a JSON summary:
+Write per-record JSONL results and an HTML report:
 
 ```powershell
-arrowcheck batch examples\batch_mixed.jsonl --output artifacts\batch_results.jsonl --summary artifacts\batch_summary.json
-```
-
-Write a secure offline HTML report:
-
-```powershell
-arrowcheck batch examples\batch_mixed.jsonl --html-report artifacts\batch_report.html
+arrowcheck batch examples\batch_mixed.jsonl --output artifacts\batch_results.jsonl --html-report artifacts\batch_report.html
 ```
 
 Regenerate the same report from saved ArrowCheck results without rerunning
@@ -84,12 +80,6 @@ ChRIMP:
 arrowcheck report artifacts\batch_results.jsonl --html-report artifacts\regenerated_report.html
 ```
 
-Write JSONL results, a summary, and a truncated HTML report together:
-
-```powershell
-arrowcheck batch examples\batch_mixed.jsonl --output artifacts\batch_results.jsonl --summary artifacts\batch_summary.json --html-report artifacts\batch_report.html --report-max-rows 500
-```
-
 Regenerate a shorter or summary-only report later:
 
 ```powershell
@@ -97,15 +87,9 @@ arrowcheck report artifacts\batch_results.jsonl --html-report artifacts\short_re
 arrowcheck report artifacts\batch_results.jsonl --html-report artifacts\summary_only.html --report-max-rows 0
 ```
 
-Make invalid records fail the shell command after processing completes:
-
-```powershell
-arrowcheck batch examples\batch_mixed.jsonl --fail-on-invalid
-```
-
 ## JSONL batch input schema
 
-Each nonblank line must be a JSON object with:
+Each nonblank input line must be a JSON object with:
 
 ```json
 {
@@ -120,12 +104,13 @@ Each nonblank line must be a JSON object with:
 
 - Blank lines are ignored.
 - Missing `case_id` falls back to `line-<line_number>`.
-- Malformed JSON rows and schema-invalid rows are reported without stopping the batch.
+- Malformed JSON rows and schema-invalid rows are recorded as batch diagnostics
+  and processing continues.
 
 ## JSONL batch output schema
 
 When `--output` is provided, ArrowCheck writes one JSON object per processed
-nonblank input row with this shape:
+nonblank row with this shape:
 
 ```json
 {
@@ -144,27 +129,58 @@ nonblank input row with this shape:
 }
 ```
 
-Malformed JSON and schema-invalid rows remain in the output stream with a batch
-diagnostic and preserved raw row text when available.
+Malformed JSON and schema-invalid model-output rows remain in the streamed
+results with preserved raw-row text when available.
 
-## HTML batch reports
+## HTML reports
 
 - `--html-report` writes one self-contained UTF-8 HTML file with no external
   scripts, fonts, stylesheets, or CDN dependencies.
 - `--report-max-rows` defaults to `500` and retains only invalid rows for the
-  HTML table while batch processing continues streaming through the full JSONL
-  file.
+  HTML table, keeping batch and report regeneration paths bounded in memory.
 - A value of `0` creates a summary-only report.
-- The HTML report never attempts to show every processed row by default. When
-  you need every individual record, use `--output results.jsonl`.
-- Only invalid rows appear in the HTML table so the report stays focused and
-  bounded in memory on large model-output files.
-- `arrowcheck report ...` reads saved `results.jsonl` incrementally and uses
-  the same bounded-memory retention logic, so you can lint once, report many
-  times without rerunning ChRIMP.
-- Corrupted saved-result files fail fast with a line-numbered CLI error and do
-  not write a misleading partial report.
-- Structure diagrams and other chemistry rendering remain deferred.
+- Only invalid rows appear in the HTML table by default. Use
+  `--output results.jsonl` when you need every processed record.
+- `arrowcheck report ...` reads saved `results.jsonl` incrementally and fails
+  fast on corruption instead of producing a misleading partial report.
+
+## Architecture
+
+ArrowCheck currently has four main layers:
+
+1. CLI entry points in `src/arrowcheck/cli.py`.
+2. Strict parsing and typed validation in `src/arrowcheck/parser.py`.
+3. A lazy upstream adapter in `src/arrowcheck/engine.py` that reconstructs
+   canonical MechSMILES before calling the pinned ChRIMP checkout.
+4. Streaming batch and report pipelines in `src/arrowcheck/batch.py` and
+   `src/arrowcheck/report.py`.
+
+The lint-only adapter deliberately bypasses upstream visualization imports so
+that ArrowCheck can validate `.prod` behavior without requiring native Cairo.
+
+## Limitations
+
+- ArrowCheck currently targets single-step linting only.
+- `hv` support remains deferred.
+- Chemical-structure rendering remains deferred.
+- Full chemical plausibility assessment remains deferred.
+- Hosted services and websites remain deferred.
+- The repository still expects a pinned local ChRIMP checkout under
+  `upstream/ChRIMP`.
+
+## Security
+
+- Raw mechanism strings, metadata, exception messages, and saved results must
+  be treated as untrusted input.
+- ArrowCheck never uses `eval()` in its own code.
+- ArrowCheck rejects malformed tuple shapes such as `(1,2,3)` and duplicate
+  atom-map identifiers before upstream execution.
+- The HTML report escapes untrusted content and uses safe client-side text
+  filtering instead of untrusted HTML injection.
+- The same HTML escaping rules apply to regenerated reports from saved
+  `results.jsonl` files.
+
+See [SECURITY.md](SECURITY.md) for the current security policy.
 
 ## Exit codes
 
@@ -173,31 +189,16 @@ diagnostic and preserved raw row text when available.
   records are invalid.
 - `arrowcheck batch ... --fail-on-invalid` returns `1` if any processed record
   is invalid.
-- CLI misuse such as a missing input file returns `2`.
-
-## Batch notes
-
-- Batch mode is streaming and suitable for large JSONL model-output files.
-- HTML reporting retains only a bounded number of invalid rows in memory.
-- `hv` handling is still deferred.
-
-## Security stance
-
-- ArrowCheck never calls `eval()` on mechanism text.
-- ArrowCheck rejects malformed tuple shapes such as `(1,2,3)`.
-- ArrowCheck rejects duplicate atom-map identifiers such as
-  `[CH3:1][OH:1].[H+:2]|(1,2)`.
-- ArrowCheck rejects function-call-like input such as
-  `__import__("os").system("calc")` before upstream execution.
-- The HTML report treats case IDs, metadata, raw rows, exception messages, and
-  MechSMILES text as untrusted content and escapes them before rendering.
-- The same HTML escaping rules apply when reports are regenerated from saved
-  `results.jsonl` files.
-- Client-side search uses DOM `textContent` matching and does not inject
-  untrusted strings with `innerHTML`.
+- `arrowcheck report ...` returns `1` for corrupted saved-result files.
+- CLI misuse such as missing input files returns `2`.
 
 ## Upstream basis
 
 - Local pinned upstream checkout: `upstream/ChRIMP`
 - Pinned SHA: `56dd595af0ce2ab8d594d2201c9906cc48489089`
-- Experimentally observed behavior is documented in `UPSTREAM_NOTES.md`
+- Experimentally observed behavior: `UPSTREAM_NOTES.md`
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, local validation
+commands, and contribution guardrails.
