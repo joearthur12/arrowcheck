@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import builtins
 from collections import Counter
 from html.parser import HTMLParser
 from pathlib import Path
 
-from arrowcheck.batch import BatchRunResult, lint_jsonl_detailed
+import arrowcheck.batch as batch
+from arrowcheck.batch import BatchRunResult, lint_jsonl_detailed, summarize_results_jsonl
 from arrowcheck.report import LIMITATIONS_NOTE, TRUNCATION_NOTE, write_batch_report
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -80,6 +82,12 @@ def build_report(
     return batch_result, report_path
 
 
+def build_saved_results(input_path: Path, tmp_path: Path, name: str = "results.jsonl") -> Path:
+    results_path = tmp_path / name
+    lint_jsonl_detailed(input_path, output_path=results_path)
+    return results_path
+
+
 def test_report_is_generated_with_summary_cards_and_parent_dirs(tmp_path: Path) -> None:
     input_path = EXAMPLES_DIR / "batch_mixed.jsonl"
 
@@ -133,6 +141,77 @@ def test_hostile_strings_are_escaped_and_remain_inert(tmp_path: Path) -> None:
 
     assert "<script>alert(1)</script>" not in html
     assert "<img src=x onerror=alert(1)>" not in html
+    assert inspector.tag_counts["script"] == 1
+    assert inspector.tag_counts["img"] == 0
+
+
+def test_saved_results_regeneration_does_not_call_linter_or_import_chrimp(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    input_path = EXAMPLES_DIR / "batch_mixed.jsonl"
+    results_path = build_saved_results(input_path, tmp_path)
+
+    monkeypatch.setattr(
+        batch,
+        "_load_lint_mechanism",
+        lambda: (_ for _ in ()).throw(AssertionError("lint loader should not run during report regeneration")),
+    )
+
+    original_import = builtins.__import__
+
+    def guarded_import(
+        name: str,
+        globals: dict[str, object] | None = None,
+        locals: dict[str, object] | None = None,
+        fromlist: tuple[object, ...] = (),
+        level: int = 0,
+    ) -> object:
+        if name == "arrowcheck.engine" or name.startswith("chrimp"):
+            raise AssertionError(f"unexpected import during report regeneration: {name}")
+        return original_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", guarded_import)
+
+    result = summarize_results_jsonl(results_path, retained_invalid_limit=2)
+
+    assert result.summary.total_records == 6
+    assert result.summary.valid_records == 2
+    assert result.summary.invalid_records == 4
+    assert result.summary.error_counts == {
+        "E_ARROW_SHAPE_INVALID": 1,
+        "E_ATOM_MAP_UNKNOWN": 1,
+        "E_BATCH_JSON_INVALID": 1,
+        "E_BATCH_SCHEMA_INVALID": 1,
+    }
+    assert [row.case_id for row in result.retained_invalid_rows] == [
+        "bad-tuple",
+        "unknown-map",
+    ]
+    assert result.omitted_invalid_rows == 2
+
+
+def test_regenerated_report_preserves_hostile_html_escaping(tmp_path: Path) -> None:
+    input_path = EXAMPLES_DIR / "batch_hostile.jsonl"
+    results_path = build_saved_results(input_path, tmp_path)
+
+    batch_result = summarize_results_jsonl(results_path, retained_invalid_limit=10)
+    report_path = tmp_path / "regenerated" / "hostile_report.html"
+    write_batch_report(
+        summary=batch_result.summary,
+        invalid_rows=batch_result.retained_invalid_rows,
+        omitted_invalid_rows=batch_result.omitted_invalid_rows,
+        output_path=report_path,
+    )
+
+    html, inspector = inspect_html(report_path)
+    visible_text = "\n".join(inspector.text_chunks)
+
+    assert "<script>alert(1)</script>" in visible_text
+    assert "<img src=x onerror=alert(1)>" in visible_text
+    assert '</script><script>alert("x")</script>' in visible_text
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
+    assert "&lt;img src=x onerror=alert(1)&gt;" in html
     assert inspector.tag_counts["script"] == 1
     assert inspector.tag_counts["img"] == 0
 

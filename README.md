@@ -11,6 +11,8 @@ ArrowCheck does not use `eval()` in its own code.
 - validates one MechSMILES string at a time;
 - streams JSONL batch inputs one record at a time for large model-output files;
 - can emit a self-contained offline HTML batch report for retained invalid rows;
+- can regenerate the same HTML report from saved ArrowCheck `results.jsonl`
+  output so you can lint once, report many times;
 - safely parses the input with RDKit plus `ast.literal_eval()`;
 - rejects malformed tuple shapes and duplicate atom-map identifiers even where
   upstream ChRIMP currently accepts them;
@@ -75,10 +77,24 @@ Write a secure offline HTML report:
 arrowcheck batch examples\batch_mixed.jsonl --html-report artifacts\batch_report.html
 ```
 
+Regenerate the same report from saved ArrowCheck results without rerunning
+ChRIMP:
+
+```powershell
+arrowcheck report artifacts\batch_results.jsonl --html-report artifacts\regenerated_report.html
+```
+
 Write JSONL results, a summary, and a truncated HTML report together:
 
 ```powershell
 arrowcheck batch examples\batch_mixed.jsonl --output artifacts\batch_results.jsonl --summary artifacts\batch_summary.json --html-report artifacts\batch_report.html --report-max-rows 500
+```
+
+Regenerate a shorter or summary-only report later:
+
+```powershell
+arrowcheck report artifacts\batch_results.jsonl --html-report artifacts\short_report.html --report-max-rows 2
+arrowcheck report artifacts\batch_results.jsonl --html-report artifacts\summary_only.html --report-max-rows 0
 ```
 
 Make invalid records fail the shell command after processing completes:
@@ -143,6 +159,11 @@ diagnostic and preserved raw row text when available.
   you need every individual record, use `--output results.jsonl`.
 - Only invalid rows appear in the HTML table so the report stays focused and
   bounded in memory on large model-output files.
+- `arrowcheck report ...` reads saved `results.jsonl` incrementally and uses
+  the same bounded-memory retention logic, so you can lint once, report many
+  times without rerunning ChRIMP.
+- Corrupted saved-result files fail fast with a line-numbered CLI error and do
+  not write a misleading partial report.
 - Structure diagrams and other chemistry rendering remain deferred.
 
 ## Exit codes
@@ -170,6 +191,8 @@ diagnostic and preserved raw row text when available.
   `__import__("os").system("calc")` before upstream execution.
 - The HTML report treats case IDs, metadata, raw rows, exception messages, and
   MechSMILES text as untrusted content and escapes them before rendering.
+- The same HTML escaping rules apply when reports are regenerated from saved
+  `results.jsonl` files.
 - Client-side search uses DOM `textContent` matching and does not inject
   untrusted strings with `innerHTML`.
 

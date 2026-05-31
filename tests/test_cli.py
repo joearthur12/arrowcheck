@@ -52,6 +52,13 @@ def write_batch_input(tmp_path: Path, name: str = "batch.jsonl") -> Path:
     return path
 
 
+def write_results_file(tmp_path: Path, name: str = "results.jsonl") -> Path:
+    batch_input = write_batch_input(tmp_path, "source_batch.jsonl")
+    results_path = tmp_path / name
+    lint_jsonl(batch_input, output_path=results_path)
+    return results_path
+
+
 def test_valid_text_output_and_exit_code(tmp_path: Path) -> None:
     mechanism = write_mechanism(
         tmp_path,
@@ -222,4 +229,141 @@ def test_batch_cli_rejects_negative_report_max_rows(tmp_path: Path) -> None:
 
     assert result.exit_code == 2
     assert "Invalid value for '--report-max-rows'" in result.output
+    assert not report_path.exists()
+
+
+def test_report_cli_regenerates_html_from_saved_results(tmp_path: Path) -> None:
+    results_path = write_results_file(tmp_path)
+    report_path = tmp_path / "artifacts" / "nested" / "regenerated_report.html"
+
+    result = runner.invoke(
+        app,
+        [
+            "report",
+            str(results_path),
+            "--html-report",
+            str(report_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert report_path.is_file()
+    report_html = report_path.read_text(encoding="utf-8")
+    assert "ArrowCheck Batch Report" in report_html
+    assert "33.3%" in report_html
+    assert "HTML report:" in result.stdout
+    assert "Total records:" in result.stdout
+    assert "E_BATCH_JSON_INVALID" in result.stdout
+
+
+def test_report_cli_supports_truncation_and_summary_only(tmp_path: Path) -> None:
+    results_path = write_results_file(tmp_path)
+    truncated_report = tmp_path / "reports" / "short_report.html"
+    summary_only_report = tmp_path / "reports" / "summary_only.html"
+
+    truncated = runner.invoke(
+        app,
+        [
+            "report",
+            str(results_path),
+            "--html-report",
+            str(truncated_report),
+            "--report-max-rows",
+            "2",
+        ],
+    )
+    summary_only = runner.invoke(
+        app,
+        [
+            "report",
+            str(results_path),
+            "--html-report",
+            str(summary_only_report),
+            "--report-max-rows",
+            "0",
+        ],
+    )
+
+    assert truncated.exit_code == 0
+    assert summary_only.exit_code == 0
+    truncated_html = truncated_report.read_text(encoding="utf-8")
+    summary_only_html = summary_only_report.read_text(encoding="utf-8")
+    assert truncated_html.count("<tr data-record-row>") == 2
+    assert "The invalid-record table is truncated." in truncated_html
+    assert summary_only_html.count("<tr data-record-row>") == 0
+    assert "Summary-only report requested or no invalid rows were retained for this file." in summary_only_html
+
+
+def test_report_cli_missing_results_file_returns_two(tmp_path: Path) -> None:
+    missing = tmp_path / "missing_results.jsonl"
+    report_path = tmp_path / "report.html"
+
+    result = runner.invoke(app, ["report", str(missing), "--html-report", str(report_path)])
+
+    assert result.exit_code == 2
+    assert "results JSONL file not found" in result.stdout
+    assert not report_path.exists()
+
+
+def test_report_cli_rejects_negative_report_max_rows(tmp_path: Path) -> None:
+    results_path = write_results_file(tmp_path)
+    report_path = tmp_path / "report.html"
+
+    result = runner.invoke(
+        app,
+        [
+            "report",
+            str(results_path),
+            "--html-report",
+            str(report_path),
+            "--report-max-rows",
+            "-1",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "Invalid value for '--report-max-rows'" in result.output
+    assert not report_path.exists()
+
+
+def test_report_cli_corrupted_results_fail_fast_without_partial_report(tmp_path: Path) -> None:
+    corrupted_results = tmp_path / "corrupted_results.jsonl"
+    corrupted_results.write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "line_number": 1,
+                        "case_id": "valid-1",
+                        "metadata": {},
+                        "validation": {
+                            "is_valid": True,
+                            "original_mechsmiles": "[CH3:1]|",
+                            "final_smiles": "[CH3]",
+                            "issues": [],
+                        },
+                        "raw_record": None,
+                    }
+                ),
+                '{"line_number":2,"case_id":"broken"',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    report_path = tmp_path / "reports" / "corrupted_report.html"
+
+    result = runner.invoke(
+        app,
+        [
+            "report",
+            str(corrupted_results),
+            "--html-report",
+            str(report_path),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "saved results JSONL is corrupted at line 2" in result.stdout
+    assert "Traceback" not in result.output
     assert not report_path.exists()

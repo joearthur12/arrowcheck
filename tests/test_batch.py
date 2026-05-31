@@ -135,7 +135,7 @@ def test_batch_mode_reuses_existing_lint_mechanism(monkeypatch: pytest.MonkeyPat
     input_path = write_batch_file(tmp_path)
     calls: list[tuple[str, str | None]] = []
 
-    def fake_lint(mechsmiles: str, context: str | None = None):
+    def fake_lint(mechsmiles: str, context: str | None = None) -> batch.ValidationResult:
         calls.append((mechsmiles, context))
         return batch.ValidationResult(
             is_valid=True,
@@ -143,7 +143,7 @@ def test_batch_mode_reuses_existing_lint_mechanism(monkeypatch: pytest.MonkeyPat
             final_smiles="fake",
         )
 
-    monkeypatch.setattr(batch, "lint_mechanism", fake_lint)
+    monkeypatch.setattr(batch, "_load_lint_mechanism", lambda: fake_lint)
 
     summary = batch.lint_jsonl(input_path)
 
@@ -167,3 +167,18 @@ def test_detailed_batch_retains_only_bounded_invalid_rows(tmp_path: Path) -> Non
         "unknown-map",
     ]
     assert result.omitted_invalid_rows == 2
+
+
+def test_saved_results_summary_matches_original_batch_summary(tmp_path: Path) -> None:
+    input_path = write_batch_file(tmp_path)
+    results_path = tmp_path / "results.jsonl"
+
+    original_summary = batch.lint_jsonl(input_path, output_path=results_path)
+    regenerated = batch.summarize_results_jsonl(results_path, retained_invalid_limit=2)
+
+    assert regenerated.summary.model_dump() == original_summary.model_dump()
+    assert [row.case_id for row in regenerated.retained_invalid_rows] == [
+        "bad-tuple",
+        "unknown-map",
+    ]
+    assert regenerated.omitted_invalid_rows == 2

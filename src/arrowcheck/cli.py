@@ -8,8 +8,12 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from arrowcheck.batch import BatchSummary, lint_jsonl_detailed
-from arrowcheck.engine import lint_mechanism
+from arrowcheck.batch import (
+    BatchSummary,
+    SavedResultsCorruptionError,
+    lint_jsonl_detailed,
+    summarize_results_jsonl,
+)
 from arrowcheck.report import write_batch_report
 from arrowcheck.taxonomy import ValidationResult
 
@@ -43,6 +47,10 @@ BATCH_INPUT_ARGUMENT = typer.Argument(
     ...,
     help="Path to a JSONL file containing batch records.",
 )
+RESULTS_INPUT_ARGUMENT = typer.Argument(
+    ...,
+    help="Path to an ArrowCheck results JSONL file.",
+)
 BATCH_OUTPUT_OPTION = typer.Option(
     None,
     "--output",
@@ -57,6 +65,11 @@ HTML_REPORT_OPTION = typer.Option(
     None,
     "--html-report",
     help="Optional self-contained HTML batch report path.",
+)
+REQUIRED_HTML_REPORT_OPTION = typer.Option(
+    ...,
+    "--html-report",
+    help="Path to write the regenerated self-contained HTML report.",
 )
 REPORT_MAX_ROWS_OPTION = typer.Option(
     500,
@@ -90,6 +103,8 @@ def lint(
         raise typer.Exit(code=2)
 
     mechsmiles = mechanism_file.read_text(encoding="utf-8").strip()
+    from arrowcheck.engine import lint_mechanism
+
     result = lint_mechanism(mechsmiles, context=context)
 
     if format is OutputFormat.JSON:
@@ -138,6 +153,45 @@ def batch(
 
     if fail_on_invalid and batch_summary.invalid_records > 0:
         raise typer.Exit(code=1)
+    raise typer.Exit(code=0)
+
+
+@app.command()
+def report(
+    results_file: Path = RESULTS_INPUT_ARGUMENT,
+    html_report: Path = REQUIRED_HTML_REPORT_OPTION,
+    report_max_rows: int = REPORT_MAX_ROWS_OPTION,
+) -> None:
+    if not results_file.is_file():
+        console.print(
+            f"Error: results JSONL file not found: {results_file}",
+            style="bold red",
+        )
+        raise typer.Exit(code=2)
+
+    try:
+        batch_result = summarize_results_jsonl(
+            results_file,
+            retained_invalid_limit=report_max_rows,
+        )
+    except SavedResultsCorruptionError as exc:
+        console.print(
+            (
+                "Error: saved results JSONL is corrupted at "
+                f"line {exc.line_number}: {exc.message}"
+            ),
+            style="bold red",
+        )
+        raise typer.Exit(code=1) from None
+
+    write_batch_report(
+        summary=batch_result.summary,
+        invalid_rows=batch_result.retained_invalid_rows,
+        omitted_invalid_rows=batch_result.omitted_invalid_rows,
+        output_path=html_report,
+    )
+    _render_batch_summary(batch_result.summary)
+    _render_batch_outputs(output=None, summary=None, html_report=html_report)
     raise typer.Exit(code=0)
 
 
