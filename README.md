@@ -1,0 +1,73 @@
+# ArrowCheck
+
+ArrowCheck is a secure structural linter for single-step MechSMILES.
+
+Version 0.1 wraps the pinned local ChRIMP checkout for the scientific move
+execution path, but it adds strict safe parsing before upstream execution.
+ArrowCheck does not use `eval()` in its own code.
+
+## What ArrowCheck does
+
+- validates one MechSMILES string at a time;
+- safely parses the input with RDKit plus `ast.literal_eval()`;
+- rejects malformed tuple shapes and duplicate atom-map identifiers even where
+  upstream ChRIMP currently accepts them;
+- calls the pinned upstream ChRIMP logic only after local validation succeeds;
+- reports stable error codes and preserves raw upstream exception details.
+
+## What ArrowCheck does not claim yet
+
+- It does not prove full chemical plausibility.
+- It does not implement batch processing.
+- It does not generate HTML reports.
+- It does not provide rendering or visualisation.
+- `hv` handling is deferred to a later milestone.
+
+The lint-only adapter deliberately bypasses upstream visualisation imports
+because rendering is outside Milestone 1A and direct visualisation imports pull
+in native Cairo requirements that are not needed for `.prod` linting.
+
+## Install
+
+The project uses a modern `src/` layout and is intended to be installed
+editable during development:
+
+```powershell
+C:\Users\joear\miniconda3\envs\arrowcheck\python.exe -m pip install -e .
+```
+
+## CLI
+
+Lint a mechanism file:
+
+```powershell
+arrowcheck lint examples\valid.txt
+```
+
+Emit full JSON:
+
+```powershell
+arrowcheck lint examples\valid.txt --format json
+```
+
+Provide optional context:
+
+```powershell
+arrowcheck lint examples\valid.txt --context "CCO"
+```
+
+## Security stance
+
+- ArrowCheck never calls `eval()` on mechanism text.
+- ArrowCheck rejects malformed tuple shapes such as `(1,2,3)`.
+- ArrowCheck rejects duplicate atom-map identifiers such as
+  `[CH3:1][OH:1].[H+:2]|(1,2)`.
+- ArrowCheck rejects function-call-like input such as
+  `__import__("os").system("calc")` before upstream execution.
+
+## Upstream basis
+
+- Local pinned upstream checkout: `upstream/ChRIMP`
+- Pinned SHA: `56dd595af0ce2ab8d594d2201c9906cc48489089`
+- Experimentally observed behavior is documented in `UPSTREAM_NOTES.md`
+
