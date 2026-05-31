@@ -9,7 +9,7 @@ def test_valid_attack_parses() -> None:
 
     assert issues == []
     assert parsed is not None
-    assert parsed.normalized_mechsmiles == "[OH-:1].[H+:2]|(1,2)"
+    assert parsed.canonical_mechsmiles == "[OH-:1].[H+:2]|(1,2)"
 
 
 def test_valid_nested_tuple_parses() -> None:
@@ -17,7 +17,7 @@ def test_valid_nested_tuple_parses() -> None:
 
     assert issues == []
     assert parsed is not None
-    assert parsed.normalized_mechsmiles == "C[C:2](=[O:3])C.[NH3:1]|(1,2);((2,3),3)"
+    assert parsed.canonical_mechsmiles == "C[C:2](=[O:3])C.[NH3:1]|(1,2);((2,3),3)"
 
 
 def test_valid_empty_arrow_section_parses() -> None:
@@ -25,7 +25,15 @@ def test_valid_empty_arrow_section_parses() -> None:
 
     assert issues == []
     assert parsed is not None
-    assert parsed.normalized_mechsmiles == "[CH3:1]|"
+    assert parsed.canonical_mechsmiles == "[CH3:1]|"
+
+
+def test_canonical_reconstruction_removes_unnecessary_spaces() -> None:
+    parsed, issues = parse_mechanism("C[C:2](=[O:3])C.[NH3:1]|(1, 2);((2, 3), 3)")
+
+    assert issues == []
+    assert parsed is not None
+    assert parsed.canonical_mechsmiles == "C[C:2](=[O:3])C.[NH3:1]|(1,2);((2,3),3)"
 
 
 def test_empty_input_rejected() -> None:

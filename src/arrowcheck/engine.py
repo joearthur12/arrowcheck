@@ -49,7 +49,7 @@ def lint_mechanism(
         mechsmiles_class = _load_upstream_mechsmiles_class()
         with redirect_stdout(StringIO()):
             upstream_mechanism = mechsmiles_class(
-                parsed.normalized_mechsmiles,
+                parsed.canonical_mechsmiles,
                 context=context,
             )
             final_smiles = upstream_mechanism.prod
@@ -112,7 +112,7 @@ def _classify_upstream_exception(
     exc_type = type(exc).__name__
     raw_message = str(exc)
     details: dict[str, object] = {
-        "normalized_mechsmiles": parsed.normalized_mechsmiles
+        "canonical_mechsmiles": parsed.canonical_mechsmiles
     }
 
     if exc_type == "MechSmilesInitError":

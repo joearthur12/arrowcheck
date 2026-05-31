@@ -35,12 +35,11 @@ class ParsedArrow:
 class ParsedMechanism:
     original_mechsmiles: str
     reactant_smiles: str
-    arrow_section: str
     atom_map_numbers: tuple[int, ...]
     arrows: tuple[ParsedArrow, ...]
 
     @property
-    def normalized_mechsmiles(self) -> str:
+    def canonical_mechsmiles(self) -> str:
         if not self.arrows:
             return f"{self.reactant_smiles}|"
         arrow_text = ";".join(arrow.canonical_text for arrow in self.arrows)
@@ -168,7 +167,6 @@ def parse_mechanism(
     parsed_mechanism = ParsedMechanism(
         original_mechsmiles=raw_text,
         reactant_smiles=reactant_smiles,
-        arrow_section=arrow_section,
         atom_map_numbers=tuple(atom_map_numbers),
         arrows=tuple(parsed_arrows),
     )

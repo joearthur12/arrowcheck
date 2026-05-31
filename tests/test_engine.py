@@ -6,6 +6,15 @@ import arrowcheck.engine as engine
 from arrowcheck.taxonomy import ErrorCode
 
 
+class FakeUpstreamMechanism:
+    def __init__(self, product: str) -> None:
+        self._product = product
+
+    @property
+    def prod(self) -> str:
+        return self._product
+
+
 def test_verified_valid_product() -> None:
     result = engine.lint_mechanism("C[C:2](=[O:3])C.[NH3:1]|(1,2);((2,3),3)")
 
@@ -56,6 +65,7 @@ def test_radical_noop_succeeds() -> None:
         ("[CH3:1][OH:1].[H+:2]|(1,2)", ErrorCode.ATOM_MAP_DUPLICATE),
         ("C[C:2](=[O:3])C.[NH3:1]|(9,2)", ErrorCode.ATOM_MAP_UNKNOWN),
         ('[OH-:1].[H+:2]|__import__("os").system("calc")', ErrorCode.ARROW_PARSE_FAILED),
+        ("[OH-:1].[H+:2]|(1+1,2)", ErrorCode.ARROW_PARSE_FAILED),
     ],
 )
 def test_parser_failures_do_not_reach_upstream(
@@ -72,3 +82,29 @@ def test_parser_failures_do_not_reach_upstream(
 
     assert result.is_valid is False
     assert result.issues[0].code == expected_code
+
+
+def test_valid_input_reaches_upstream_with_canonical_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, str | None] = {}
+
+    def fake_loader():
+        def fake_constructor(value: str, context: str | None = None) -> FakeUpstreamMechanism:
+            captured["value"] = value
+            captured["context"] = context
+            return FakeUpstreamMechanism("canonical-product")
+
+        return fake_constructor
+
+    monkeypatch.setattr(engine, "_load_upstream_mechsmiles_class", fake_loader)
+
+    raw_input = "C[C:2](=[O:3])C.[NH3:1]|(1, 2);((2, 3), 3)"
+    result = engine.lint_mechanism(raw_input, context="CCO")
+
+    assert result.is_valid is True
+    assert result.final_smiles == "canonical-product"
+    assert captured == {
+        "value": "C[C:2](=[O:3])C.[NH3:1]|(1,2);((2,3),3)",
+        "context": "CCO",
+    }
