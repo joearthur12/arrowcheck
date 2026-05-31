@@ -8,8 +8,9 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from arrowcheck.batch import BatchSummary, lint_jsonl
+from arrowcheck.batch import BatchSummary, lint_jsonl_detailed
 from arrowcheck.engine import lint_mechanism
+from arrowcheck.report import write_batch_report
 from arrowcheck.taxonomy import ValidationResult
 
 console = Console()
@@ -52,6 +53,17 @@ BATCH_SUMMARY_OPTION = typer.Option(
     "--summary",
     help="Optional JSON summary output path.",
 )
+HTML_REPORT_OPTION = typer.Option(
+    None,
+    "--html-report",
+    help="Optional self-contained HTML batch report path.",
+)
+REPORT_MAX_ROWS_OPTION = typer.Option(
+    500,
+    "--report-max-rows",
+    min=0,
+    help="Maximum number of invalid rows to retain inside the HTML report.",
+)
 FAIL_ON_INVALID_OPTION = typer.Option(
     False,
     "--fail-on-invalid",
@@ -93,6 +105,8 @@ def batch(
     input_file: Path = BATCH_INPUT_ARGUMENT,
     output: Path | None = BATCH_OUTPUT_OPTION,
     summary: Path | None = BATCH_SUMMARY_OPTION,
+    html_report: Path | None = HTML_REPORT_OPTION,
+    report_max_rows: int = REPORT_MAX_ROWS_OPTION,
     fail_on_invalid: bool = FAIL_ON_INVALID_OPTION,
 ) -> None:
     if not input_file.is_file():
@@ -102,12 +116,25 @@ def batch(
         )
         raise typer.Exit(code=2)
 
-    batch_summary = lint_jsonl(input_file, output_path=output)
+    batch_result = lint_jsonl_detailed(
+        input_file,
+        output_path=output,
+        retained_invalid_limit=report_max_rows if html_report is not None else 0,
+    )
+    batch_summary = batch_result.summary
     if summary is not None:
         summary.parent.mkdir(parents=True, exist_ok=True)
         summary.write_text(batch_summary.model_dump_json(indent=2), encoding="utf-8")
+    if html_report is not None:
+        write_batch_report(
+            summary=batch_summary,
+            invalid_rows=batch_result.retained_invalid_rows,
+            omitted_invalid_rows=batch_result.omitted_invalid_rows,
+            output_path=html_report,
+        )
 
     _render_batch_summary(batch_summary)
+    _render_batch_outputs(output=output, summary=summary, html_report=html_report)
 
     if fail_on_invalid and batch_summary.invalid_records > 0:
         raise typer.Exit(code=1)
@@ -171,6 +198,24 @@ def _render_batch_summary(summary: BatchSummary) -> None:
         for error_code, count in summary.error_counts.items():
             errors_table.add_row(error_code, str(count))
         console.print(errors_table)
+
+
+def _render_batch_outputs(
+    *,
+    output: Path | None,
+    summary: Path | None,
+    html_report: Path | None,
+) -> None:
+    if output is None and summary is None and html_report is None:
+        return
+
+    console.print()
+    if output is not None:
+        console.print(f"Results JSONL: {output}")
+    if summary is not None:
+        console.print(f"Summary JSON: {summary}")
+    if html_report is not None:
+        console.print(f"HTML report: {html_report}")
 
 
 if __name__ == "__main__":

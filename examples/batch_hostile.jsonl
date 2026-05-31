@@ -1,0 +1,2 @@
+{"case_id":"<script>alert(1)</script>","mechsmiles":"[OH-:1].[H+:2]|(1,2,3)","metadata":{"note":"<img src=x onerror=alert(1)>"}}
+{"case_id":"</script><script>alert(\"x\")</script>","metadata":{"payload":"</script><script>alert(\"x\")</script>"}}

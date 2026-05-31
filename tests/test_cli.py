@@ -167,3 +167,59 @@ def test_batch_cli_writes_output_and_summary_and_creates_nested_directories(tmp_
     summary_payload = json.loads(summary_path.read_text(encoding="utf-8"))
     expected_summary = lint_jsonl(batch_input).model_dump()
     assert summary_payload == expected_summary
+
+
+def test_batch_cli_writes_html_report_and_combined_outputs(tmp_path: Path) -> None:
+    batch_input = write_batch_input(tmp_path)
+    output_path = tmp_path / "artifacts" / "results.jsonl"
+    summary_path = tmp_path / "artifacts" / "summary.json"
+    report_path = tmp_path / "artifacts" / "report.html"
+
+    result = runner.invoke(
+        app,
+        [
+            "batch",
+            str(batch_input),
+            "--output",
+            str(output_path),
+            "--summary",
+            str(summary_path),
+            "--html-report",
+            str(report_path),
+            "--report-max-rows",
+            "2",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert output_path.is_file()
+    assert summary_path.is_file()
+    assert report_path.is_file()
+    report_html = report_path.read_text(encoding="utf-8")
+    assert "ArrowCheck Batch Report" in report_html
+    assert "The invalid-record table is truncated." in report_html
+    assert report_html.count("<tr data-record-row>") == 2
+    assert "Results JSONL:" in result.stdout
+    assert "Summary JSON:" in result.stdout
+    assert "HTML report:" in result.stdout
+
+
+def test_batch_cli_rejects_negative_report_max_rows(tmp_path: Path) -> None:
+    batch_input = write_batch_input(tmp_path)
+    report_path = tmp_path / "artifacts" / "report.html"
+
+    result = runner.invoke(
+        app,
+        [
+            "batch",
+            str(batch_input),
+            "--html-report",
+            str(report_path),
+            "--report-max-rows",
+            "-1",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "Invalid value for '--report-max-rows'" in result.output
+    assert not report_path.exists()

@@ -35,10 +35,27 @@ class BatchSummary(BaseModel):
     error_counts: dict[str, int] = Field(default_factory=dict)
 
 
+class BatchRunResult(BaseModel):
+    summary: BatchSummary
+    retained_invalid_rows: list[BatchRecordResult] = Field(default_factory=list)
+    omitted_invalid_rows: int = 0
+
+
 def lint_jsonl(
     input_path: Path,
     output_path: Path | None = None,
 ) -> BatchSummary:
+    return lint_jsonl_detailed(input_path, output_path=output_path).summary
+
+
+def lint_jsonl_detailed(
+    input_path: Path,
+    output_path: Path | None = None,
+    retained_invalid_limit: int = 0,
+) -> BatchRunResult:
+    if retained_invalid_limit < 0:
+        raise ValueError("retained_invalid_limit must be >= 0")
+
     if output_path is not None:
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -46,6 +63,8 @@ def lint_jsonl(
     valid_records = 0
     invalid_records = 0
     error_counts: Counter[str] = Counter()
+    retained_invalid_rows: list[BatchRecordResult] = []
+    omitted_invalid_rows = 0
 
     output_context = (
         output_path.open("w", encoding="utf-8")
@@ -69,6 +88,10 @@ def lint_jsonl(
                 valid_records += 1
             else:
                 invalid_records += 1
+                if len(retained_invalid_rows) < retained_invalid_limit:
+                    retained_invalid_rows.append(record_result)
+                else:
+                    omitted_invalid_rows += 1
 
             for issue in record_result.validation.issues:
                 error_counts[issue.code.value] += 1
@@ -77,11 +100,15 @@ def lint_jsonl(
                 output_handle.write(record_result.model_dump_json())
                 output_handle.write("\n")
 
-    return BatchSummary(
-        total_records=total_records,
-        valid_records=valid_records,
-        invalid_records=invalid_records,
-        error_counts=dict(sorted(error_counts.items())),
+    return BatchRunResult(
+        summary=BatchSummary(
+            total_records=total_records,
+            valid_records=valid_records,
+            invalid_records=invalid_records,
+            error_counts=dict(sorted(error_counts.items())),
+        ),
+        retained_invalid_rows=retained_invalid_rows,
+        omitted_invalid_rows=omitted_invalid_rows,
     )
 
 

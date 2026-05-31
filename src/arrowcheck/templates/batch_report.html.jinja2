@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ArrowCheck Batch Report</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f1e8;
+      --panel: #fffdf9;
+      --panel-alt: #f1ede4;
+      --ink: #1f1a16;
+      --muted: #675c52;
+      --accent: #2f7c6e;
+      --accent-soft: #d8ece7;
+      --danger: #a63d40;
+      --danger-soft: #f4d9d8;
+      --border: #d8cec1;
+      --shadow: 0 12px 30px rgba(31, 26, 22, 0.08);
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at top right, rgba(47, 124, 110, 0.12), transparent 28rem),
+        linear-gradient(180deg, #faf6ef 0%, var(--bg) 100%);
+      color: var(--ink);
+    }
+
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 3rem;
+    }
+
+    .hero,
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+    }
+
+    .hero {
+      padding: 2rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .eyebrow {
+      margin: 0 0 0.5rem;
+      color: var(--accent);
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin-top: 0;
+    }
+
+    h1 {
+      margin-bottom: 0.4rem;
+      font-size: clamp(2rem, 4vw, 3rem);
+      line-height: 1.05;
+    }
+
+    .subtitle {
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 1.05rem;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .summary-card {
+      padding: 1.2rem;
+    }
+
+    .summary-label {
+      display: block;
+      margin-bottom: 0.45rem;
+      color: var(--muted);
+      font-size: 0.88rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .summary-value {
+      display: block;
+      font-size: 2rem;
+      font-weight: 700;
+    }
+
+    .panel {
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      padding: 0.9rem 0.8rem;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--muted);
+      font-size: 0.85rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .metric {
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .bar-track {
+      width: 100%;
+      min-width: 10rem;
+      height: 0.7rem;
+      border-radius: 999px;
+      background: var(--panel-alt);
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--accent) 0%, #53b39d 100%);
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.8rem 1rem;
+      align-items: end;
+      margin-bottom: 1rem;
+    }
+
+    .toolbar label,
+    .toolbar p {
+      margin-bottom: 0;
+    }
+
+    .toolbar input {
+      width: min(28rem, 100%);
+      padding: 0.75rem 0.85rem;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+    }
+
+    .note {
+      margin: 1rem 0 0;
+      padding: 0.95rem 1rem;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--panel-alt);
+      color: var(--muted);
+    }
+
+    .warning-note {
+      border-color: #e7b5b2;
+      background: var(--danger-soft);
+      color: #5e2527;
+    }
+
+    .record-code {
+      display: inline-block;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 0.88rem;
+      white-space: nowrap;
+    }
+
+    details {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--panel-alt);
+      padding: 0.8rem 0.9rem;
+    }
+
+    details summary {
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .detail-grid {
+      display: grid;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .detail-grid h3 {
+      margin-bottom: 0.4rem;
+      font-size: 1rem;
+    }
+
+    .issue-card {
+      padding: 0.9rem;
+      border-radius: 14px;
+      background: #fff;
+      border: 1px solid var(--border);
+    }
+
+    .issue-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      margin: 0.65rem 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .label {
+      display: block;
+      margin-bottom: 0.35rem;
+      color: var(--muted);
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    pre {
+      margin: 0;
+      padding: 0.85rem;
+      border-radius: 12px;
+      background: #1f1a16;
+      color: #f8f3ea;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+
+    .empty-state {
+      color: var(--muted);
+    }
+
+    @media (max-width: 800px) {
+      main {
+        padding-inline: 0.85rem;
+      }
+
+      .hero,
+      .panel {
+        border-radius: 16px;
+      }
+
+      th,
+      td {
+        padding-inline: 0.6rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <p class="eyebrow">ArrowCheck Batch Report</p>
+      <h1>ArrowCheck Batch Report</h1>
+      <p class="subtitle">Secure structural linting for MechSMILES</p>
+    </section>
+
+    <section class="summary-grid">
+      <article class="summary-card hero" data-summary-card="total-records">
+        <span class="summary-label">Total Records</span>
+        <span class="summary-value" data-summary-value="total-records">{{ report.total_records }}</span>
+      </article>
+      <article class="summary-card hero" data-summary-card="valid-records">
+        <span class="summary-label">Valid Records</span>
+        <span class="summary-value" data-summary-value="valid-records">{{ report.valid_records }}</span>
+      </article>
+      <article class="summary-card hero" data-summary-card="invalid-records">
+        <span class="summary-label">Invalid Records</span>
+        <span class="summary-value" data-summary-value="invalid-records">{{ report.invalid_records }}</span>
+      </article>
+      <article class="summary-card hero" data-summary-card="pass-rate">
+        <span class="summary-label">Pass Rate</span>
+        <span class="summary-value" data-summary-value="pass-rate">{{ report.pass_rate_label }}</span>
+      </article>
+    </section>
+
+    <section class="panel">
+      <h2>Error Categories</h2>
+      {% if report.error_categories %}
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Code</th>
+              <th scope="col">Count</th>
+              <th scope="col">Percent of Records</th>
+              <th scope="col">Bar</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for category in report.error_categories %}
+            <tr data-error-code="{{ category.code }}">
+              <td class="metric">{{ category.code }}</td>
+              <td class="metric">{{ category.count }}</td>
+              <td class="metric">{{ category.percentage_label }}</td>
+              <td>
+                <div class="bar-track" aria-hidden="true">
+                  <div class="bar-fill" style="width: {{ '%.1f'|format(category.bar_width_percent) }}%;"></div>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="empty-state">No error categories were recorded for this batch.</p>
+      {% endif %}
+    </section>
+
+    <section class="panel">
+      <h2>Invalid Records</h2>
+      <div class="toolbar">
+        <div>
+          <label for="record-search" class="label">Search retained invalid rows</label>
+          <input id="record-search" type="search" placeholder="Search line number, case ID, error code, message, or details">
+        </div>
+        <p id="search-status" aria-live="polite">{{ report.invalid_rows|length }} retained invalid rows shown.</p>
+      </div>
+
+      {% if report.show_truncation_note %}
+      <p class="note warning-note">{{ truncation_note }}</p>
+      {% endif %}
+
+      {% if report.show_summary_only_note %}
+      <p class="note">Summary-only report requested or no invalid rows were retained for this file.</p>
+      {% endif %}
+
+      {% if report.invalid_rows %}
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Line</th>
+              <th scope="col">Case ID</th>
+              <th scope="col">Primary Error</th>
+              <th scope="col">Primary Message</th>
+              <th scope="col">Details</th>
+            </tr>
+          </thead>
+          <tbody id="invalid-records-table">
+            {% for row in report.invalid_rows %}
+            <tr data-record-row>
+              <td class="metric">{{ row.line_number }}</td>
+              <td>{{ row.case_id }}</td>
+              <td><span class="record-code">{{ row.primary_error_code }}</span></td>
+              <td>{{ row.primary_message }}</td>
+              <td>
+                <details>
+                  <summary>Expand details</summary>
+                  <div class="detail-grid">
+                    <section>
+                      <span class="label">Original MechSMILES</span>
+                      <pre>{{ row.original_mechsmiles }}</pre>
+                    </section>
+                    <section>
+                      <span class="label">Metadata</span>
+                      <pre>{{ row.metadata_json }}</pre>
+                    </section>
+                    {% if row.raw_row_text %}
+                    <section>
+                      <span class="label">Raw Row Text</span>
+                      <pre>{{ row.raw_row_text }}</pre>
+                    </section>
+                    {% endif %}
+                    <section>
+                      <span class="label">Diagnostic Issues</span>
+                      {% for issue in row.issues %}
+                      <article class="issue-card">
+                        <h3>{{ issue.code }}</h3>
+                        <p>{{ issue.message }}</p>
+                        <div class="issue-meta">
+                          <span>Severity: {{ issue.severity }}</span>
+                          <span>Stage: {{ issue.stage }}</span>
+                          {% if issue.step_index is not none %}<span>Step: {{ issue.step_index }}</span>{% endif %}
+                          {% if issue.arrow_index is not none %}<span>Arrow: {{ issue.arrow_index }}</span>{% endif %}
+                          {% if issue.atom_map_numbers %}<span>Atom Maps: {{ issue.atom_map_numbers }}</span>{% endif %}
+                        </div>
+                        {% if issue.suggested_fix %}
+                        <section>
+                          <span class="label">Suggested Fix</span>
+                          <pre>{{ issue.suggested_fix }}</pre>
+                        </section>
+                        {% endif %}
+                        {% if issue.raw_exception_type or issue.raw_exception_message %}
+                        <section>
+                          <span class="label">Raw Upstream Exception</span>
+                          <pre>{{ issue.raw_exception_type or "<none>" }}: {{ issue.raw_exception_message or "<none>" }}</pre>
+                        </section>
+                        {% endif %}
+                        <section>
+                          <span class="label">Structured Details</span>
+                          <pre>{{ issue.details_json }}</pre>
+                        </section>
+                      </article>
+                      {% endfor %}
+                    </section>
+                  </div>
+                </details>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="empty-state">No invalid records were retained for this report.</p>
+      {% endif %}
+    </section>
+
+    <section class="panel">
+      <h2>Limitations</h2>
+      <p>{{ limitations_note }}</p>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      const input = document.getElementById("record-search");
+      const rows = Array.from(document.querySelectorAll("[data-record-row]"));
+      const status = document.getElementById("search-status");
+
+      if (!input || !status || rows.length === 0) {
+        return;
+      }
+
+      const updateStatus = (visibleCount, hasQuery) => {
+        if (hasQuery) {
+          status.textContent = `${visibleCount} retained invalid rows match.`;
+          return;
+        }
+        status.textContent = `${rows.length} retained invalid rows shown.`;
+      };
+
+      input.addEventListener("input", () => {
+        const query = input.value.trim().toLowerCase();
+        let visibleCount = 0;
+
+        for (const row of rows) {
+          const matches = query === "" || row.textContent.toLowerCase().includes(query);
+          row.hidden = !matches;
+          if (matches) {
+            visibleCount += 1;
+          }
+        }
+
+        updateStatus(visibleCount, query !== "");
+      });
+    })();
+  </script>
+</body>
+</html>

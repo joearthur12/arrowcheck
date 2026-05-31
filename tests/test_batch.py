@@ -154,3 +154,16 @@ def test_batch_mode_reuses_existing_lint_mechanism(monkeypatch: pytest.MonkeyPat
         ("C[C:2](=[O:3])C.[NH3:1]|(9,2)", None),
         ("[CH3:1]|", None),
     ]
+
+
+def test_detailed_batch_retains_only_bounded_invalid_rows(tmp_path: Path) -> None:
+    input_path = write_batch_file(tmp_path)
+
+    result = batch.lint_jsonl_detailed(input_path, retained_invalid_limit=2)
+
+    assert result.summary.invalid_records == 4
+    assert [row.case_id for row in result.retained_invalid_rows] == [
+        "bad-tuple",
+        "unknown-map",
+    ]
+    assert result.omitted_invalid_rows == 2

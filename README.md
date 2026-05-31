@@ -10,6 +10,7 @@ ArrowCheck does not use `eval()` in its own code.
 
 - validates one MechSMILES string at a time;
 - streams JSONL batch inputs one record at a time for large model-output files;
+- can emit a self-contained offline HTML batch report for retained invalid rows;
 - safely parses the input with RDKit plus `ast.literal_eval()`;
 - rejects malformed tuple shapes and duplicate atom-map identifiers even where
   upstream ChRIMP currently accepts them;
@@ -19,8 +20,8 @@ ArrowCheck does not use `eval()` in its own code.
 ## What ArrowCheck does not claim yet
 
 - It does not prove full chemical plausibility.
-- It does not generate HTML reports.
 - It does not provide rendering or visualisation.
+- It does not render chemical structure diagrams inside reports yet.
 - `hv` handling is deferred to a later milestone.
 
 The lint-only adapter deliberately bypasses upstream visualisation imports
@@ -66,6 +67,18 @@ Write streaming JSONL results plus a JSON summary:
 
 ```powershell
 arrowcheck batch examples\batch_mixed.jsonl --output artifacts\batch_results.jsonl --summary artifacts\batch_summary.json
+```
+
+Write a secure offline HTML report:
+
+```powershell
+arrowcheck batch examples\batch_mixed.jsonl --html-report artifacts\batch_report.html
+```
+
+Write JSONL results, a summary, and a truncated HTML report together:
+
+```powershell
+arrowcheck batch examples\batch_mixed.jsonl --output artifacts\batch_results.jsonl --summary artifacts\batch_summary.json --html-report artifacts\batch_report.html --report-max-rows 500
 ```
 
 Make invalid records fail the shell command after processing completes:
@@ -118,6 +131,20 @@ nonblank input row with this shape:
 Malformed JSON and schema-invalid rows remain in the output stream with a batch
 diagnostic and preserved raw row text when available.
 
+## HTML batch reports
+
+- `--html-report` writes one self-contained UTF-8 HTML file with no external
+  scripts, fonts, stylesheets, or CDN dependencies.
+- `--report-max-rows` defaults to `500` and retains only invalid rows for the
+  HTML table while batch processing continues streaming through the full JSONL
+  file.
+- A value of `0` creates a summary-only report.
+- The HTML report never attempts to show every processed row by default. When
+  you need every individual record, use `--output results.jsonl`.
+- Only invalid rows appear in the HTML table so the report stays focused and
+  bounded in memory on large model-output files.
+- Structure diagrams and other chemistry rendering remain deferred.
+
 ## Exit codes
 
 - `arrowcheck lint ...` returns `0` for valid input and `1` for invalid input.
@@ -130,7 +157,7 @@ diagnostic and preserved raw row text when available.
 ## Batch notes
 
 - Batch mode is streaming and suitable for large JSONL model-output files.
-- HTML reporting is still deferred.
+- HTML reporting retains only a bounded number of invalid rows in memory.
 - `hv` handling is still deferred.
 
 ## Security stance
@@ -141,6 +168,10 @@ diagnostic and preserved raw row text when available.
   `[CH3:1][OH:1].[H+:2]|(1,2)`.
 - ArrowCheck rejects function-call-like input such as
   `__import__("os").system("calc")` before upstream execution.
+- The HTML report treats case IDs, metadata, raw rows, exception messages, and
+  MechSMILES text as untrusted content and escapes them before rendering.
+- Client-side search uses DOM `textContent` matching and does not inject
+  untrusted strings with `innerHTML`.
 
 ## Upstream basis
 
