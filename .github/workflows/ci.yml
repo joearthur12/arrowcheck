@@ -40,57 +40,6 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev]"
 
-      - name: Probe ArrowCheck upstream adapter
-        run: |
-          python - <<'PY'
-          import json
-          import os
-          import sys
-          from pathlib import Path
-
-          print("cwd:", os.getcwd())
-          print("python:", sys.version)
-          print("upstream exists:", Path("upstream/ChRIMP/src").exists())
-
-          try:
-              from arrowcheck.engine import lint_mechanism
-          except Exception as exc:
-              print("\n=== import_failure ===")
-              print(
-                  json.dumps(
-                      {
-                          "error": "import_failure",
-                          "exception_type": type(exc).__name__,
-                          "exception_message": str(exc),
-                      },
-                      indent=2,
-                  )
-              )
-          else:
-              cases = {
-                  "valid_file": Path("examples/valid.txt").read_text(encoding="utf-8"),
-                  "radical_noop": "[CH3:1]|",
-              }
-
-              for name, mechsmiles in cases.items():
-                  print(f"\n=== {name} ===")
-                  try:
-                      result = lint_mechanism(mechsmiles)
-                      print(result.model_dump_json(indent=2))
-                  except Exception as exc:
-                      print(
-                          json.dumps(
-                              {
-                                  "error": "lint_mechanism_raised",
-                                  "case": name,
-                                  "exception_type": type(exc).__name__,
-                                  "exception_message": str(exc),
-                              },
-                              indent=2,
-                          )
-                      )
-          PY
-
       - name: Run pytest
         run: python -m pytest -q
 
