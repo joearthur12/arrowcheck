@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+- Added `arrowcheck setup` for safe automated acquisition and verification of
+  the pinned ChRIMP checkout.
+
 ## [0.1.0] - 2026-05-31
 
 - Added secure single-step MechSMILES linting on top of the pinned local

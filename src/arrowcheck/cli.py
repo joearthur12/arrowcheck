@@ -15,6 +15,7 @@ from arrowcheck.batch import (
     summarize_results_jsonl,
 )
 from arrowcheck.report import write_batch_report
+from arrowcheck.setup_upstream import PROJECT_ROOT, SetupResult, setup_upstream
 from arrowcheck.taxonomy import ValidationResult
 
 console = Console()
@@ -55,6 +56,14 @@ BATCH_OUTPUT_OPTION = typer.Option(
     None,
     "--output",
     help="Optional output JSONL path for per-record results.",
+)
+UPSTREAM_DIR_OPTION = typer.Option(
+    None,
+    "--upstream-dir",
+    help=(
+        "Optional override path for the pinned upstream checkout, relative to "
+        "the ArrowCheck project root unless absolute."
+    ),
 )
 BATCH_SUMMARY_OPTION = typer.Option(
     None,
@@ -157,6 +166,15 @@ def batch(
 
 
 @app.command()
+def setup(
+    upstream_dir: Path | None = UPSTREAM_DIR_OPTION,
+) -> None:
+    result = setup_upstream(PROJECT_ROOT, upstream_dir=upstream_dir)
+    _render_setup_result(result)
+    raise typer.Exit(code=0 if result.success else 1)
+
+
+@app.command()
 def report(
     results_file: Path = RESULTS_INPUT_ARGUMENT,
     html_report: Path = REQUIRED_HTML_REPORT_OPTION,
@@ -229,6 +247,25 @@ def _render_text_result(result: ValidationResult) -> None:
                 f"{issue.raw_exception_type or '<none>'}: "
                 f"{issue.raw_exception_message or '<none>'}"
             )
+
+
+def _render_setup_result(result: SetupResult) -> None:
+    lines = [
+        result.message,
+        f"Upstream path: {result.upstream_path}",
+        f"Expected SHA: {result.expected_sha}",
+    ]
+    if result.actual_sha is not None:
+        lines.append(f"Actual SHA: {result.actual_sha}")
+    lines.append(f"Action: {result.action_taken}")
+
+    console.print(
+        Panel.fit(
+            "\n".join(lines),
+            title="ArrowCheck Setup",
+            border_style="green" if result.success else "red",
+        )
+    )
 
 
 def _render_batch_summary(summary: BatchSummary) -> None:

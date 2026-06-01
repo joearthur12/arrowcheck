@@ -11,10 +11,11 @@ from pathlib import Path
 from typing import Protocol
 
 from arrowcheck.parser import ParsedMechanism, parse_mechanism
+from arrowcheck.setup_upstream import DEFAULT_UPSTREAM_RELATIVE_PATH
 from arrowcheck.taxonomy import DiagnosticIssue, ErrorCode, Stage, ValidationResult
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-UPSTREAM_SRC = PROJECT_ROOT / "upstream" / "ChRIMP" / "src"
+UPSTREAM_SRC = PROJECT_ROOT / DEFAULT_UPSTREAM_RELATIVE_PATH / "src"
 MPLCONFIGDIR = PROJECT_ROOT / ".mplconfig"
 
 

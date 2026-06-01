@@ -16,20 +16,18 @@ reconstruction before upstream execution.
 ```powershell
 conda create -n arrowcheck python=3.12 -y
 conda activate arrowcheck
+git clone https://github.com/joearthur12/arrowcheck.git
+cd arrowcheck
 python -m pip install -e .
+arrowcheck setup
 arrowcheck lint examples\valid.txt
 arrowcheck batch examples\batch_mixed.jsonl --output artifacts\batch_results.jsonl --html-report artifacts\batch_report.html
-arrowcheck report artifacts\batch_results.jsonl --html-report artifacts\regenerated_report.html
 ```
 
-Current repository expectation:
-
-- local pinned upstream checkout path: `upstream/ChRIMP`
-- pinned upstream SHA: `56dd595af0ce2ab8d594d2201c9906cc48489089`
-
-Automated upstream acquisition and packaging will be improved later. For now,
-the repository expects the pinned local checkout to already exist under
-`upstream/ChRIMP`.
+The setup command clones and verifies the pinned upstream ChRIMP checkout under
+`upstream/ChRIMP`. It is safe to run more than once, and it refuses to
+overwrite unexpected or dirty checkouts. Advanced users can still prepare the
+same pinned checkout manually if needed.
 
 ## Features
 
@@ -40,6 +38,8 @@ the repository expects the pinned local checkout to already exist under
 - Streaming JSONL batch linting for large model-output files.
 - Secure offline HTML reports for invalid rows.
 - Saved-results HTML regeneration so you can lint once, report many times.
+- Safe automated acquisition and verification of the pinned upstream ChRIMP
+  checkout.
 
 ## CLI
 
@@ -65,6 +65,12 @@ Run streaming batch linting:
 
 ```powershell
 arrowcheck batch examples\batch_mixed.jsonl
+```
+
+Prepare or verify the pinned upstream checkout:
+
+```powershell
+arrowcheck setup
 ```
 
 Write per-record JSONL results and an HTML report:
@@ -154,6 +160,8 @@ ArrowCheck currently has four main layers:
    canonical MechSMILES before calling the pinned ChRIMP checkout.
 4. Streaming batch and report pipelines in `src/arrowcheck/batch.py` and
    `src/arrowcheck/report.py`.
+5. Safe upstream checkout acquisition and verification in
+   `src/arrowcheck/setup_upstream.py`.
 
 The lint-only adapter deliberately bypasses upstream visualization imports so
 that ArrowCheck can validate `.prod` behavior without requiring native Cairo.
@@ -165,8 +173,9 @@ that ArrowCheck can validate `.prod` behavior without requiring native Cairo.
 - Chemical-structure rendering remains deferred.
 - Full chemical plausibility assessment remains deferred.
 - Hosted services and websites remain deferred.
-- The repository still expects a pinned local ChRIMP checkout under
-  `upstream/ChRIMP`.
+- Automated upstream setup is currently limited to cloning and verifying the
+  pinned ChRIMP checkout. It does not add broader dependency management for
+  upstream training workflows.
 
 ## Security
 
@@ -194,7 +203,7 @@ See [SECURITY.md](SECURITY.md) for the current security policy.
 
 ## Upstream basis
 
-- Local pinned upstream checkout: `upstream/ChRIMP`
+- Managed upstream checkout path: `upstream/ChRIMP`
 - Pinned SHA: `56dd595af0ce2ab8d594d2201c9906cc48489089`
 - Experimentally observed behavior: `UPSTREAM_NOTES.md`
 
